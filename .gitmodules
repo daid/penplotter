@@ -1,0 +1,3 @@
+[submodule "svg-fonts"]
+	path = svg-fonts
+	url = https://gitlab.com/oskay/svg-fonts.git
