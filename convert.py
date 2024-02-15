@@ -114,8 +114,8 @@ struct Font {
 
 def main():
     # d = Dumper("dump.svg")
-    e = Exporter("fonts.cpp")
-    for path, dirs, files in os.walk("svg-fonts/fonts"):
+    e = Exporter("fonts.inc")
+    for path, dirs, files in os.walk(os.path.join(os.path.dirname(__file__), "svg-fonts/fonts")):
         for file in files:
             if file.endswith(".svg"):
                 if file == "TwinSans.svg":  # Skip this font which has curves in the ascii set
