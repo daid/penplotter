@@ -58,7 +58,7 @@ void planner_init();
 
 // Add a new linear movement to the buffer. x, y and z is the signed, absolute target position in
 // millimeters. Feed rate specifies the speed of the motion.
-bool planner_buffer_line(const float (&position)[INPUT_AXIS_COUNT], float feed_rate);
+bool planner_buffer_line(const float (&position)[INPUT_AXIS_COUNT], float feed_rate, float acceleration);
 
 // Set position. Used for G92 instructions.
 void planner_set_position(const float (&position)[INPUT_AXIS_COUNT]);
@@ -69,7 +69,6 @@ extern float max_feedrate[OUTPUT_AXIS_COUNT]; // set the max speeds
 
 extern unsigned long max_acceleration_units_per_sq_second[OUTPUT_AXIS_COUNT]; // Use M201 to override by software
 extern float minimumfeedrate;
-extern float acceleration;         //Normal acceleration mm/s^2  THIS IS THE DEFAULT ACCELERATION for all moves. M204 SXXXX
 extern float max_xy_jerk;          //speed that can be stopped at once, if I understand correctly.
 extern float max_z_jerk;
 extern unsigned long axis_steps_per_sqr_second[OUTPUT_AXIS_COUNT];

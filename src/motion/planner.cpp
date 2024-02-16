@@ -53,7 +53,7 @@
 
 #include "planner.h"
 #include "plannerConfig.h"
-#include "arch.h"
+#include "arch/stepperMotor.h"
 
 #include <math.h>
 #include <string.h>
@@ -69,7 +69,6 @@
 float max_feedrate[OUTPUT_AXIS_COUNT] = DEFAULT_MAX_FEEDRATE; // set the max speeds
 unsigned long max_acceleration_units_per_sq_second[OUTPUT_AXIS_COUNT] = DEFAULT_MAX_ACCELERATION; // Use M201 to override by software
 float minimumfeedrate = 0;
-float acceleration = DEFAULT_ACCELERATION;         // Normal acceleration mm/s^2  THIS IS THE DEFAULT ACCELERATION for all moves. M204 SXXXX
 float max_xy_jerk = DEFAULT_XYJERK; //speed than can be stopped at once, if i understand correctly.
 float max_z_jerk = DEFAULT_ZJERK;
 unsigned long axis_steps_per_sqr_second[OUTPUT_AXIS_COUNT];
@@ -117,11 +116,11 @@ static int8_t prev_block_index(int8_t block_index)
 
 // Calculates the distance (not time) it takes to accelerate from initial_rate to target_rate using the
 // given acceleration:
-static inline float estimate_acceleration_distance(float initial_rate, float target_rate, float acceleration)
+static inline float estimate_acceleration_distance(float initial_rate, float target_rate, float acceleration_st)
 {
-    if(acceleration == 0)
+    if(acceleration_st == 0)
         return 0.0;  // acceleration was 0, set acceleration distance to 0
-    return (target_rate*target_rate-initial_rate*initial_rate) / (2.0*acceleration);
+    return (target_rate*target_rate-initial_rate*initial_rate) / (2.0*acceleration_st);
 }
 
 // This function gives you the point at which you must start braking (at the rate of -acceleration) if
@@ -129,11 +128,11 @@ static inline float estimate_acceleration_distance(float initial_rate, float tar
 // a total travel of distance. This can be used to compute the intersection point between acceleration and
 // deceleration in the cases where the trapezoid has no plateau (i.e. never reaches maximum speed)
 
-static inline float intersection_distance(float initial_rate, float final_rate, float acceleration, float distance)
+static inline float intersection_distance(float initial_rate, float final_rate, float acceleration_st, float distance)
 {
-    if(acceleration == 0)
+    if(acceleration_st == 0)
         return 0.0;  // acceleration was 0, set intersection distance to 0
-    return (2.0*acceleration*distance-initial_rate*initial_rate+final_rate*final_rate) / (4.0*acceleration);
+    return (2.0*acceleration_st*distance-initial_rate*initial_rate+final_rate*final_rate) / (4.0*acceleration_st);
 }
 
 // Calculates trapezoid parameters so that the entry- and exit-speed is compensated by the provided factors.
@@ -149,11 +148,11 @@ void calculate_trapezoid_for_block(block_t* const block, const float entry_facto
     if(final_rate < 120)
         final_rate=120;
 
-    const int32_t acceleration = block->acceleration_st;
+    const int32_t acceleration_st = block->acceleration_st;
 
     // Steps required for acceleration, deceleration to/from nominal rate.
-    int32_t accelerate_steps = ceil(estimate_acceleration_distance(initial_rate, block->nominal_rate, acceleration));
-    int32_t decelerate_steps = floor(estimate_acceleration_distance(block->nominal_rate, final_rate, -acceleration));
+    int32_t accelerate_steps = ceil(estimate_acceleration_distance(initial_rate, block->nominal_rate, acceleration_st));
+    int32_t decelerate_steps = floor(estimate_acceleration_distance(block->nominal_rate, final_rate, -acceleration_st));
 
     // Steps between acceleration and deceleration, if any.
     int32_t plateau_steps = block->step_event_count-accelerate_steps-decelerate_steps;
@@ -164,16 +163,14 @@ void calculate_trapezoid_for_block(block_t* const block, const float entry_facto
     // reach the final_rate exactly at the end of this block.
     if (plateau_steps < 0)
     {
-        accelerate_steps = ceil(intersection_distance(initial_rate, final_rate, acceleration, block->step_event_count));
+        accelerate_steps = ceil(intersection_distance(initial_rate, final_rate, acceleration_st, block->step_event_count));
         accelerate_steps = std::max(accelerate_steps, 0); // Check limits due to numerical round-off
         accelerate_steps = std::min((uint32_t)accelerate_steps, block->step_event_count);//(We can cast here to unsigned, because the above line ensures that we are above zero)
         plateau_steps = 0;
     }
 
-    // block->accelerate_until = accelerate_steps;
-    // block->decelerate_after = accelerate_steps+plateau_steps;
-    CRITICAL_SECTION
     {
+        stepper_motors_interrupt_disable();
         // Fill variables used by the stepper in a critical section
         if(!block->busy) // Don't update variables if block is busy.
         {
@@ -182,6 +179,7 @@ void calculate_trapezoid_for_block(block_t* const block, const float entry_facto
             block->initial_rate = initial_rate;
             block->final_rate = final_rate;
         }
+        stepper_motors_interrupt_enable();
     }
 }
 
@@ -195,6 +193,7 @@ static inline float max_allowable_speed(float acceleration, float target_velocit
 // The kernel called by planner_recalculate() when scanning the plan from last to first entry.
 void planner_reverse_pass_kernel(block_t *previous, block_t *current, block_t *next)
 {
+    (void)previous;
     if(!current)
         return;
 
@@ -229,9 +228,10 @@ void planner_reverse_pass()
     uint8_t tail;
 
     //Make a local copy of block_buffer_tail, because the interrupt can alter it
-    CRITICAL_SECTION
     {
+        stepper_motors_interrupt_disable();
         tail = block_buffer_tail;
+        stepper_motors_interrupt_enable();
     }
 
     // When we have 3 or more moves in the planner buffer, then ...
@@ -255,6 +255,7 @@ void planner_reverse_pass()
 // The kernel called by planner_recalculate() when scanning the plan from first to last entry.
 void planner_forward_pass_kernel(block_t *previous, block_t *current, block_t *next)
 {
+    (void)next;
     if(!previous)
         return;
 
@@ -366,7 +367,7 @@ void planner_init()
 }
 
 // Add a new linear movement to the buffer.
-bool planner_buffer_line(const float (&position)[INPUT_AXIS_COUNT], float feed_rate)
+bool planner_buffer_line(const float (&position)[INPUT_AXIS_COUNT], float feed_rate, float acceleration)
 {
     // Calculate the buffer head after we push this byte
     int8_t next_buffer_head = next_block_index(block_buffer_head);
@@ -393,7 +394,7 @@ bool planner_buffer_line(const float (&position)[INPUT_AXIS_COUNT], float feed_r
     for(uint8_t n=0; n<OUTPUT_AXIS_COUNT; n++)
     {
         // Number of steps for each axis
-        block->steps[n] = labs(target_step_position[n]-final_step_position[n]);
+        block->steps[n] = std::abs(target_step_position[n]-final_step_position[n]);
         block->step_event_count = std::max(block->step_event_count, block->steps[n]);
         // Compute direction bits for this block
         if (target_step_position[n] < final_step_position[n])
@@ -411,6 +412,7 @@ bool planner_buffer_line(const float (&position)[INPUT_AXIS_COUNT], float feed_r
     float delta_mm[OUTPUT_AXIS_COUNT];
     for(uint8_t n=0; n<OUTPUT_AXIS_COUNT; n++)
         delta_mm[n] = (target_step_position[n]-final_step_position[n])/axis_steps_per_unit[n];
+#if OUTPUT_AXIS_COUNT > 2
     if (block->steps[0] || block->steps[1] || block->steps[2])
     {
         block->millimeters = sqrt(square(delta_mm[0]) + square(delta_mm[1]) + square(delta_mm[2]));
@@ -426,6 +428,11 @@ bool planner_buffer_line(const float (&position)[INPUT_AXIS_COUNT], float feed_r
             }
         }
     }
+#elif OUTPUT_AXIS_COUNT == 2
+    block->millimeters = sqrt(square(delta_mm[0]) + square(delta_mm[1]));
+#else
+    block->millimeters = delta_mm[0];
+#endif
     float inverse_millimeters = 1.0/block->millimeters;  // Inverse millimeters to remove multiple divides
 
     // Calculate speed in mm/second for each axis. No divide by zero due to previous checks.
@@ -467,8 +474,10 @@ bool planner_buffer_line(const float (&position)[INPUT_AXIS_COUNT], float feed_r
     // Start with a safe speed (from which the machine may halt to stop immediately).
     float vmax_junction = max_xy_jerk/2;
     float vmax_junction_factor = 1.0;
+#if OUTPUT_AXIS_COUNT > 2
     if(fabs(current_speed[2]) > max_z_jerk/2)
         vmax_junction = std::min(vmax_junction, max_z_jerk/2);
+#endif
     vmax_junction = std::min(vmax_junction, block->nominal_speed);
     float safe_speed = vmax_junction;
     
@@ -479,8 +488,10 @@ bool planner_buffer_line(const float (&position)[INPUT_AXIS_COUNT], float feed_r
         vmax_junction = block->nominal_speed;
         if (xy_jerk > max_xy_jerk)
             vmax_junction_factor = (max_xy_jerk / xy_jerk);
+#if OUTPUT_AXIS_COUNT > 2
         if(fabs(current_speed[2] - previous_speed[2]) > max_z_jerk)
             vmax_junction_factor = std::min(vmax_junction_factor, (max_z_jerk/fabs(current_speed[2] - previous_speed[2])));
+#endif
         vmax_junction = std::min(previous_nominal_speed, vmax_junction * vmax_junction_factor); // Limit speed to max previous speed
     }
 

@@ -89,7 +89,6 @@ struct Font {
         symbol = name.lower()
         for unicode, (advance, lines) in glyphs.items():
             self.__f.write(f"static const int16_t _font_glyph_{symbol}_{ord(unicode)}[] = {{")
-            self.__f.write(f"{int(advance)},")
             for line in lines:
                 for x, y in line:
                     self.__f.write(f"{int(x)},{int(y)},")
