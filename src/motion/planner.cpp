@@ -164,8 +164,8 @@ void calculate_trapezoid_for_block(block_t* const block, const float entry_facto
     if (plateau_steps < 0)
     {
         accelerate_steps = ceil(intersection_distance(initial_rate, final_rate, acceleration_st, block->step_event_count));
-        accelerate_steps = std::max(accelerate_steps, 0); // Check limits due to numerical round-off
-        accelerate_steps = std::min((uint32_t)accelerate_steps, block->step_event_count);//(We can cast here to unsigned, because the above line ensures that we are above zero)
+        accelerate_steps = std::max(accelerate_steps, (int32_t)0); // Check limits due to numerical round-off
+        accelerate_steps = std::min((uint32_t)accelerate_steps, (uint32_t)block->step_event_count);//(We can cast here to unsigned, because the above line ensures that we are above zero)
         plateau_steps = 0;
     }
 

@@ -29,6 +29,14 @@ void stepper_motors_interrupt_enable()
 {
 }
 
+void stepper_motors_disable()
+{
+}
+
+void stepper_motors_enable()
+{
+}
+
 void stepper_motors_set_interval(unsigned int interval_us)
 {
     timer_interval_us = interval_us;

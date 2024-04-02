@@ -3,6 +3,7 @@
 #include "fonts.h"
 #include "arch/pen.h"
 #include "arch/sleep.h"
+#include "arch/stepperMotor.h"
 #include <stdio.h>
 
 
@@ -17,9 +18,11 @@ int main()
     stepper_init();
     pen_init();
 
+    stepper_motors_enable();
     font_set("EMSHerculean");
     for(auto c : "Hello world")
         plot_glyph(c);
+    stepper_motors_disable();
 /*
     planner_set_position({0.0, 0.0});
     planner_buffer_line({1.0, 0.0}, 3000, 1000);

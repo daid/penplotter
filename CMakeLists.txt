@@ -1,7 +1,15 @@
 cmake_minimum_required(VERSION 3.5.1)
+if (PICO_SDK_PATH)
+  include(pico_sdk_import.cmake)
+endif()
 project(penplotter)
 
-set(TARGET_ARCH "sim")
+if (PICO_SDK_PATH)
+  set(TARGET_ARCH "rp2040")
+  pico_sdk_init()
+else()
+  set(TARGET_ARCH "sim")
+endif()
 
 find_package(PythonInterp 3.8 REQUIRED)
 add_custom_command(
@@ -22,3 +30,7 @@ add_executable(penplotter
 )
 target_compile_options(penplotter PUBLIC -Wall -Wextra -Wshadow)
 target_include_directories(penplotter PUBLIC src src/arch/${TARGET_ARCH} ${CMAKE_CURRENT_BINARY_DIR})
+if (PICO_SDK_PATH)
+    target_link_libraries(penplotter PUBLIC pico_stdlib)
+    pico_add_extra_outputs(penplotter)
+endif()
