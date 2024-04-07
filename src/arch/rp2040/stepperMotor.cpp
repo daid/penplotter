@@ -5,12 +5,15 @@
 #include <hardware/gpio.h>
 #include <hardware/irq.h>
 #include <pico/time.h>
+#include <pico/stdlib.h>
+#include <stdio.h>
+
 
 static constexpr uint32_t enable_pin = 2;
-static constexpr uint32_t step0_dir = 9;
-static constexpr uint32_t step1_dir = 11;
-static constexpr uint32_t step0_pin = 10;
-static constexpr uint32_t step1_pin = 12;
+static constexpr uint32_t step0_dir = 11;
+static constexpr uint32_t step0_pin = 12;
+static constexpr uint32_t step1_dir = 9;
+static constexpr uint32_t step1_pin = 10;
 
 
 static InterruptFunctionPtr stepper_interrupt;
@@ -25,6 +28,7 @@ static bool timer_callback(repeating_timer_t*)
 
 void stepper_motors_init(InterruptFunctionPtr interrupt_function)
 {
+    stdio_init_all();
     gpio_init(enable_pin);
     gpio_set_dir(enable_pin, true);
     gpio_put(enable_pin, true);

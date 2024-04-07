@@ -1,3 +1,6 @@
 [submodule "svg-fonts"]
 	path = svg-fonts
 	url = https://gitlab.com/oskay/svg-fonts.git
+[submodule "Pico-PIO-USB"]
+	path = Pico-PIO-USB
+	url = https://github.com/sekigon-gonnoc/Pico-PIO-USB.git

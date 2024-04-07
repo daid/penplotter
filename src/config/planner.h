@@ -2,7 +2,7 @@
 
 
 #define TAPE_ROLL_DIAMETER_MM         100.0
-#define TAPE_ROLL_MOTOR_STEPS         (200.0 * 16.0)
+#define TAPE_ROLL_MOTOR_STEPS         (400.0 * 16.0)
 
 
 #define INPUT_AXIS_COUNT 2
@@ -13,7 +13,7 @@
 
 
 #define M_PI                          3.14159265358979323846
-#define DEFAULT_AXIS_STEPS_PER_UNIT   {200.0, TAPE_ROLL_MOTOR_STEPS / (TAPE_ROLL_DIAMETER_MM * M_PI)}
+#define DEFAULT_AXIS_STEPS_PER_UNIT   {TAPE_ROLL_MOTOR_STEPS / (TAPE_ROLL_DIAMETER_MM * M_PI), 400.0}
 
 // The speed change that does not require acceleration (i.e. the software might assume it can be done instantaneously)
 #define DEFAULT_XYJERK                1.0      // (mm/sec)
